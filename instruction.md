@@ -20,13 +20,17 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
 - Écran ST7789 135×240 : CS 34, MOSI 35, SCLK 36, DC 37, RST 38, BL 33.
 - Référence de config PlatformIO fonctionnelle (écran) : dépôt `DrX7FFF/ESP32LilygoScreen` (`board = esp32-s2-saola-1`, framework arduino, TFT_eSPI).
 
+## Brodeuse : Elna eXpressive 830 (équivalent Janome MC500E / elna 830E)
+- Fichiers lus : `.jef` uniquement → la sync ne copie que les `.jef`.
+- Système de fichiers : FAT32.
+- Taille max du support : 16 Go → carte SD ≤ 16 Go, ou partition exposée ≤ 16 Go.
+- Emplacement des fichiers : `EMB/Embf/` à la racine (`EMB` optionnel).
+
 ## Contraintes
 - USB Full Speed : ~1 Mo/s max.
-- Format SD lisible par la brodeuse (FAT32, voire FAT16 ou petite partition) : dépend du modèle.
 - Le basculement Sync → USB ne doit pas intervenir pendant une lecture de la brodeuse.
 
 ## Points ouverts
-- Modèle de brodeuse et ses contraintes (taille max de clé, système de fichiers, formats de fichiers, détection à chaud).
 - Méthode d'authentification Google Drive sur l'ESP32.
 - Déclenchement de la sync (périodique, bouton, détection de changement).
 - Rôle de l'écran (état, dernière sync, erreurs).
