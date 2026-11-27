@@ -19,6 +19,16 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
 - Partitions : `min_spiffs.csv` (2 × 1,9 Mo pour le programme ; SPIFFS 128 Ko non utilisé).
 - OTA : ArduinoOTA depuis PlatformIO (`pio run -e ota -t upload`, cible cloud2usb.local) ; autre solution (sans PC) à trouver plus tard.
 - Heure : NTP à prévoir (sans heure, les fichiers écrits en FTP sont datés du 1er janvier).
+- Téléchargement des achats emblibrary.com (étude validée sur PC le 2026-11-26, détail dans `docs/emblibrary/`), en mode Réseau, réglages sur la page web :
+  - Connexion : e-mail puis code à 6 chiffres reçu, une seule fois ; la session est ensuite réutilisée (durée réelle de validité non mesurée). Ne pas multiplier les demandes de code (blocage constaté après 4 demandes en ~20 min).
+  - Un dossier par commande dans `EMB/Embf/`, nommé `AAAA MM JJ NN` (jour de la commande, heure de Paris ; NN = rang de la commande dans le jour, 00 pour la première).
+  - Déjà téléchargé = repère sauvegardé (date de la dernière commande traitée), pas les fichiers présents (tri et effacement libres). Premier lancement : date de départ saisie.
+  - Par motif : tous les `.jef` du ZIP (un par taille pour « All Sizes ») + l'image du motif (`<sku>.jpg`).
+  - Motif en échec (carte cadeau, erreur) : signalé « à télécharger à la main », ignoré ; le repère avance quand même.
+  - ESP32 : ZIP (4,5 Mo et plus constatés pour « All Sizes ») reçu au fil de l'eau dans `Cloud2USB/tmp.zip` sur la SD (pas de limite de taille liée à la mémoire), puis sommaire lu à la fin du fichier, chaque `.jef` chargé seul en mémoire, décompressé avec le décompresseur intégré à la puce (ROM) et écrit ; ZIP temporaire effacé.
+  - Mise en œuvre (`emb.cpp`) : tâche de fond ; certificat du site non vérifié (POC) ; e-mail et repère « Depuis » mémorisés dans les réglages, le repère avance après chaque commande ; cookies de session gardés en mémoire de réglages.
+  - Page web : bouton « Télécharger » (mode Réseau seulement) ; si le site n'accepte plus la session, l'e-mail est envoyé et la page affiche le champ code + « Valider » (10 min max) ; avancement rafraîchi toutes les 2 s ; changement de mode bloqué pendant le téléchargement ; compte rendu (dossiers créés, motifs à télécharger à la main).
+  - Journal détaillé des échanges (envoyé / reçu) : activable depuis la page web, non mémorisé (désactivé au démarrage), écrit dans `Cloud2USB/journal.txt` sur la SD, refait à chaque téléchargement ; lisible en FTP. Contient e-mail, code et cookies.
 - Écran : affiche l'état de l'appareil (seule source d'information : le port USB est pris par la brodeuse, pas de journal série).
 
 ## Matériel : LilyGO T8 ESP32-S2 (V1.1, écran ST7789 1.14")
@@ -36,16 +46,18 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
 
 ## Contraintes
 - USB Full Speed : ~1 Mo/s max.
+- Pilote SPI de la SD (cœur Arduino) : il range les données par mots de 4 octets ; une lecture en milieu de fichier vers une adresse non multiple de 4 fait planter la puce (LoadStoreAlignment, constaté le 2026-11-26). Lectures à position quelconque : depuis un début de secteur, par secteurs de 512 o, via un tampon aligné.
 - Le basculement Sync → USB ne doit pas intervenir pendant une lecture de la brodeuse.
 
 ## Points ouverts
 - Authentification Google Drive : reportée ; d'abord une simulation du Drive.
 - Bouton de synchro : sur la page web pour le proto (toutes les commandes sont sur la page web).
+- Page emblibrary, à adapter plus tard : après « Valider » le code, la page s'affiche avant que l'ESP ait pris le code et reste sur la saisie (pas de rafraîchissement dans cet état) ; il faut recharger à la main.
 
 ## Étapes
 1. Wi-Fi + page web de réglages.
 2. Carte SD + modes USB / Réseau (commutateur) + FTP.
-3. Synchro éventuelle (Drive simulé, puis vrai Drive).
+3. Synchro éventuelle (Drive simulé, puis vrai Drive) ; téléchargement des achats emblibrary.com.
 4. Écran d'état.
 
 ## Méthode de travail
