@@ -16,7 +16,7 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
 - Accès réseau aux fichiers : FTP (plutôt que WebDAV), pour organiser dossiers et fichiers et renommer depuis Android (« Gestionnaire de fichiers + »), Nautilus ou l'explorateur Windows.
 - POC : au plus simple et au plus fiable. Framework Arduino. FTP = `xreef/SimpleFTPServer` (anonyme, port 21), actif uniquement en mode Réseau. Page de réglages et commutateur de mode : WebServer Arduino, port 80. (WebDAV abandonné : ESPWebDAV ne compile pas sur S2 / Arduino 3, `zonque/webdav-server` sans verrouillage et non maintenue.)
 - Clé USB : classe Arduino `USBMSC`, lecture/écriture (`isWritable(true)`) ; mode Réseau = `tud_disconnect()`, retour USB = `tud_connect()`. Mode USB au démarrage. Au démarrage, on attend que l'appareil branché ait reconnu la clé (événement USB « démarré », 5 s max pour le cas d'un simple chargeur) avant de lancer Wi-Fi, web, FTP et OTA : la reconnaissance se fait sans concurrence. (La tâche USB a déjà la priorité la plus haute ; l'événement d'éjection est ignoré car la brodeuse ne l'envoie peut-être pas.)
-- Partitions : `min_spiffs.csv` (2 × 1,9 Mo pour le programme ; SPIFFS 128 Ko non utilisé).
+- Partitions : T8 `min_spiffs.csv` (2 × 1,9 Mo pour le programme ; SPIFFS 128 Ko non utilisé) ; XIAO `default_8MB.csv` (par défaut de la carte).
 - OTA : ArduinoOTA depuis PlatformIO (`pio run -e ota -t upload`, cible cloud2usb.local) ; autre solution (sans PC) à trouver plus tard.
 - Heure : NTP à prévoir (sans heure, les fichiers écrits en FTP sont datés du 1er janvier).
 - Téléchargement des achats emblibrary.com (étude validée sur PC le 2026-11-26, détail dans `docs/emblibrary/`), en mode Réseau, réglages sur la page web :
@@ -31,7 +31,14 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
   - Journal détaillé des échanges (envoyé / reçu) : activable depuis la page web, non mémorisé (désactivé au démarrage), écrit dans `Cloud2USB/journal.txt` sur la SD, refait à chaque téléchargement ; lisible en FTP. Contient e-mail, code et cookies.
 - Écran : affiche l'état de l'appareil (seule source d'information : le port USB est pris par la brodeuse, pas de journal série).
 
-## Matériel : LilyGO T8 ESP32-S2 (V1.1, écran ST7789 1.14")
+## Matériel : Seeed XIAO ESP32S3 (environnements `xiaos3`, `xiaos3_ota`), carte retenue
+- ESP32-S3R8 : 512 Ko SRAM, PSRAM 8 Mo, flash 8 Mo, double cœur. Antenne externe U.FL.
+- USB-C relié directement à l'USB natif (GPIO19/20). Réglé en clé USB (TinyUSB), pas en port série : flash par câble en maintenant BOOT au branchement, sinon OTA.
+- Carte SD en natif 1 ligne (SD_MMC), module LC Studio : CLK = D8 (GPIO7, broche SCK du module), CMD = D10 (GPIO9, MOSI), DAT0 = D9 (GPIO8, MISO), DAT3 (CS) relié au 3,3 V ; module alimenté en 3V3.
+- Choix du S3 : sur le T8 S2, les écritures SD en SPI s'arrêtent avant la fin dès que le Wi-Fi est connecté (9 fichiers sur 20, tests du 2026-11-27), et la mémoire interne est trop juste pour la connexion chiffrée.
+- À venir : LilyGO T-Dongle-S3-Plus (format clé, écran).
+
+## Matériel : LilyGO T8 ESP32-S2 (V1.1, écran ST7789 1.14"), environnements `t8s2`, `ota`
 - ESP32-S2, 4 Mo flash, PSRAM 8 Mo, mono-cœur.
 - USB OTG natif sur GPIO19 (D-) / GPIO20 (D+) : mettre les interrupteurs DIP côté USB-C en position OTG (par défaut reliés au convertisseur USB-série).
 - Carte SD (SPI, pas de SDMMC sur le S2) : CS 10, MOSI 11, SCLK 12, MISO 13.
@@ -46,7 +53,7 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
 
 ## Contraintes
 - USB Full Speed : ~1 Mo/s max.
-- Pilote SPI de la SD (cœur Arduino) : il range les données par mots de 4 octets ; une lecture en milieu de fichier vers une adresse non multiple de 4 fait planter la puce (LoadStoreAlignment, constaté le 2026-11-26). Lectures à position quelconque : depuis un début de secteur, par secteurs de 512 o, via un tampon aligné.
+- Pilote SPI de la SD (cœur Arduino, T8) : il range les données par mots de 4 octets ; une lecture en milieu de fichier vers une adresse non multiple de 4 fait planter la puce (LoadStoreAlignment, constaté le 2026-11-26). Lectures à position quelconque : depuis un début de secteur, par secteurs de 512 o, via un tampon aligné.
 - Le basculement Sync → USB ne doit pas intervenir pendant une lecture de la brodeuse.
 
 ## Points ouverts

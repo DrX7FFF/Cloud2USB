@@ -4,7 +4,7 @@
 #include <NetworkClientSecure.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
-#include <SD.h>
+#include "card.h"
 #include <algorithm>
 #include <map>
 #include <mutex>
@@ -362,7 +362,7 @@ static int extractJef(File &z, const String &dir) {
       jefs = -1;
       break;
     }
-    File f = SD.open(dir + "/" + name.substring(name.lastIndexOf('/') + 1), FILE_WRITE);
+    File f = CARD.open(dir + "/" + name.substring(name.lastIndexOf('/') + 1), FILE_WRITE);
     bool opened = f;
     size_t w = opened ? f.write(out, us) : 0;
     f.close();
@@ -394,8 +394,8 @@ static int downloadJef(const String &client, const String &order, const String &
   String url = j["downloadUrl"] | "";
   if (url.isEmpty()) return -1;
   // ZIP reçu dans un fichier temporaire : pas de limite de taille liée à la mémoire
-  SD.mkdir("/Cloud2USB");
-  File f = SD.open(TMP_ZIP, FILE_WRITE);
+  CARD.mkdir("/Cloud2USB");
+  File f = CARD.open(TMP_ZIP, FILE_WRITE);
   if (!f) {
     why = "ouverture du ZIP temporaire";
     return -1;
@@ -407,23 +407,23 @@ static int downloadJef(const String &client, const String &order, const String &
   why = "réception du ZIP (" + codeText(c) + ", " + String(received) + " o)";
   int n = -1;
   if (c == 200) {
-    File z = SD.open(TMP_ZIP, FILE_READ);
+    File z = CARD.open(TMP_ZIP, FILE_READ);
     if (z) n = extractJef(z, dir);
     z.close();
   }
-  SD.remove(TMP_ZIP);
+  CARD.remove(TMP_ZIP);
   return n;
 }
 
 static bool saveImage(const String &url, const String &sku, const String &dir) {
   String path = url.substring(0, url.indexOf('?') < 0 ? url.length() : url.indexOf('?'));
   String file = dir + "/" + sku + path.substring(path.lastIndexOf('.'));
-  File f = SD.open(file, FILE_WRITE);
+  File f = CARD.open(file, FILE_WRITE);
   int c = f ? request(url, "GET", "", {{"Accept", "*/*"}}, &f).code : 0;
   bool ok = c == 200;
   why = f ? codeText(c) + ", " + String(f.size()) + " o écrits" : String("ouverture du fichier");
   f.close();
-  if (!ok) SD.remove(file);
+  if (!ok) CARD.remove(file);
   return ok;
 }
 
@@ -494,9 +494,9 @@ static String syncOrders() {
     char name[32];
     snprintf(name, sizeof name, "%s %02d", day, r);
     String dir = String("/EMB/Embf/") + name, manual;
-    SD.mkdir("/EMB");
-    SD.mkdir("/EMB/Embf");
-    SD.mkdir(dir);
+    CARD.mkdir("/EMB");
+    CARD.mkdir("/EMB/Embf");
+    CARD.mkdir(dir);
     int jefs = 0, imgs = 0;
     for (size_t i = 0; i < o.items.size(); i++) {
       Item &it = o.items[i];
@@ -523,8 +523,8 @@ static void run(void *) {
   setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
   tzset();
   if (journalOn) {
-    SD.mkdir("/Cloud2USB");
-    journal = SD.open("/Cloud2USB/journal.txt", FILE_WRITE);
+    CARD.mkdir("/Cloud2USB");
+    journal = CARD.open("/Cloud2USB/journal.txt", FILE_WRITE);
     jlog("Début (" + memInfo() + ")\n");
   }
   {  // verrou et texte libérés avant la fin de la tâche
