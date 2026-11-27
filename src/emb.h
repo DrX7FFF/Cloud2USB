@@ -1,7 +1,8 @@
 #pragma once
 #include <Arduino.h>
 
-// Téléchargement des achats emblibrary.com vers EMB/Embf/ (en mode Réseau), en tâche de fond.
+// Téléchargement des achats emblibrary.com vers EMB/Embf/ (en mode WiFi), en tâche de fond.
+extern const char *EMB_SITE;     // adresse du site par défaut
 enum class EmbState { Idle, Running, WaitCode };
 
 void embStart();                  // lance le téléchargement des commandes postérieures au repère

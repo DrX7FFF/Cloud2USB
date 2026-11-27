@@ -12,14 +12,12 @@
 #include "miniz.h"
 #include <esp_heap_caps.h>
 
-static const char *ACC = "https://account.emblibrary.com";
+const char *EMB_SITE = "https://account.emblibrary.com";
+static String ACC;  // adresse du site : réglage, ou EMB_SITE
 static const char *UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
 static const std::vector<std::pair<String, String>> HTML = {{"Accept", "text/html,application/xhtml+xml,*/*;q=0.8"}};
 static const char *TMP_ZIP = "/Cloud2USB/tmp.zip";
-static const char *ASSETS = "https://assets.emblibrary.com/downloadReq/embroidery-library-store.myshopify.com/";
-static const char *EXT_TOKEN = "{uiExtensionSessionToken(appId:\"gid://shopify/App/249361858561\","
-  "configurationRecordId:\"gid://shopify/CheckoutProfile/4835508524\","
-  "registrationUuid:\"d3552f83-ade7-4a6a-985a-5baa436664e2\",extensionType:ACTIVATED){value}}";
+static String ASSETS, EXT_TOKEN;  // lus dans la page des commandes (extension de téléchargement), à chaque exécution
 static const char *ORDERS = "query($q:String,$after:String){customer{id orders(first:50,after:$after,sortKey:PROCESSED_AT,query:$q){"
   "pageInfo{hasNextPage endCursor} nodes{id processedAt lineItems(first:100){nodes{name sku quantity variantId image{url}}}}}}}";
 
@@ -178,7 +176,7 @@ static Resp request(String url, String method = "GET", String payload = "",
 static String token;
 
 static String accessToken() {
-  Resp r = request(String(ACC) + "/oauth/token", "GET", "", {{"Accept", "application/json"}});
+  Resp r = request(ACC + "/oauth/token", "GET", "", {{"Accept", "application/json"}});
   JsonDocument d;
   if (r.code != 200 || deserializeJson(d, r.body)) return "";
   return d["access_token"] | "";
@@ -190,7 +188,7 @@ static bool gql(const String &query, const String &vars, JsonDocument &out) {
   q["variables"] = serialized(vars);
   String body;
   serializeJson(q, body);
-  Resp r = request(String(ACC) + "/customer/api/unstable/graphql", "POST", body,
+  Resp r = request(ACC + "/customer/api/unstable/graphql", "POST", body,
                    {{"Content-Type", "application/json"}, {"Accept", "application/json"}, {"Authorization", token}});
   return r.code == 200 && !deserializeJson(out, r.body) && out["errors"].isNull();
 }
@@ -217,7 +215,7 @@ static String urlDecode(const String &s) {
 static String login(const String &email) {
   setStatus("Connexion au site…");
   jar.clear();
-  Resp r = request(String(ACC) + "/orders", "GET", "", HTML);
+  Resp r = request(ACC + "/orders", "GET", "", HTML);
   String canon = between(r.body, "data-serialized-id=\"canonical-login-url\">", '<');
   String csrf = between(r.body, "name=\"csrf-token\" content=\"", '"');
   JsonDocument d;
@@ -241,7 +239,7 @@ static String login(const String &email) {
                                               {"X-CSRF-Token", csrf}, {"Origin", ACC}, {"Referer", url}};
   String body;
   serializeJson(p, body);
-  r = request(String(ACC) + "/authentication/login", "POST", body, h);
+  r = request(ACC + "/authentication/login", "POST", body, h);
   if (r.code != 200 || r.body.indexOf("\"nextStep\":\"code\"") < 0) return "e-mail refusé (réponse " + String(r.code) + ")";
 
   {
@@ -266,13 +264,34 @@ static String login(const String &email) {
   p["code"] = c;
   body = "";
   serializeJson(p, body);
-  r = request(String(ACC) + "/authentication/login", "POST", body, h);
+  r = request(ACC + "/authentication/login", "POST", body, h);
   JsonDocument a;
   String redir = r.code == 200 && !deserializeJson(a, r.body) ? (a["data"]["redirect_uri"] | "") : "";
   if (redir.isEmpty()) return "code refusé (réponse " + String(r.code) + ")";
   request(join(ACC, redir), "GET", "", HTML);
   saveJar();
   return "";
+}
+
+// Extension de téléchargement décrite dans la page des commandes : identifiants, adresse et boutique. Renvoie false si absente.
+static bool readExtension() {
+  Resp r = request(ACC + "/orders", "GET", "", HTML);
+  int i = r.body.indexOf("data-serialized-id=\"extensions-data\">");
+  int j = r.body.indexOf("</script>", i);
+  JsonDocument d;
+  if (i < 0 || j < 0 || deserializeJson(d, r.body.substring(r.body.indexOf('>', i) + 1, j))) return false;
+  for (JsonObject e : d.as<JsonArray>()) {
+    if (e["extension"]["handle"] != "order-oneclick-download") continue;
+    String txt, app = e["extension"]["appId"] | "", rec = e["configurationRecordId"] | "", uuid = e["extension"]["id"] | "";
+    serializeJson(e, txt);
+    String dom = between(txt, "\"url_domain\":\"", '"'), shop = between(txt, "\"shop_name\":\"", '"');
+    if (app.isEmpty() || rec.isEmpty() || uuid.isEmpty() || dom.isEmpty() || shop.isEmpty()) return false;
+    ASSETS = dom + "downloadReq/" + shop + "/";
+    EXT_TOKEN = "{uiExtensionSessionToken(appId:\"" + app + "\",configurationRecordId:\"" + rec +
+                "\",registrationUuid:\"" + uuid + "\",extensionType:ACTIVATED){value}}";
+    return true;
+  }
+  return false;
 }
 
 // Heure de Paris (règles d'heure d'été)
@@ -386,7 +405,7 @@ static int downloadJef(const String &client, const String &order, const String &
   why = "jeton";
   if (!gql(EXT_TOKEN, "{}", d)) return -1;
   String ext = d["data"]["uiExtensionSessionToken"]["value"] | "";
-  Resp r = request(String(ASSETS) + client + "/" + num(order) + "/" + num(variant) + "/", "GET", "",
+  Resp r = request(ASSETS + client + "/" + num(order) + "/" + num(variant) + "/", "GET", "",
                    {{"Authorization", "Bearer " + ext}, {"Accept", "application/json"}});
   JsonDocument j;
   why = "lien (" + codeText(r.code) + ")";
@@ -427,7 +446,7 @@ static bool saveImage(const String &url, const String &sku, const String &dir) {
   return ok;
 }
 
-// Synchro : commandes postérieures au repère, un dossier par commande. Renvoie une erreur, ou "".
+// Commandes postérieures au repère, un dossier par commande. Renvoie une erreur, ou "".
 struct Item { String name, sku, variant, image; int qty; };
 struct Order { String id, at; std::vector<Item> items; };
 
@@ -436,6 +455,7 @@ static String syncOrders() {
   if (s.email.isEmpty() || s.since.isEmpty()) return "e-mail et date de début à renseigner";
   String since = s.since.length() == 10 ? s.since + "T00:00:00Z" : s.since;
 
+  ACC = s.site.length() ? s.site : EMB_SITE;
   setStatus("Connexion…");
   loadJar();
   token = accessToken();
@@ -445,6 +465,7 @@ static String syncOrders() {
     token = accessToken();
     if (token.isEmpty()) return "connexion refusée";
   }
+  if (!readExtension()) return "page des commandes inattendue";
 
   // Commandes depuis le début du jour du repère (heure de Paris), pour numéroter celles du jour
   time_t t = parseUtc(since);
