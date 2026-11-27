@@ -35,7 +35,7 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
 - ESP32-S3R8 : 512 Ko SRAM, PSRAM 8 Mo, flash 8 Mo, double cœur. Antenne externe U.FL.
 - USB-C relié directement à l'USB natif (GPIO19/20). Réglé en clé USB (TinyUSB), pas en port série : flash par câble en maintenant BOOT au branchement, sinon OTA.
 - Carte SD en natif 1 ligne (SD_MMC), module LC Studio : CLK = D8 (GPIO7, broche SCK du module), CMD = D10 (GPIO9, MOSI), DAT0 = D9 (GPIO8, MISO), DAT3 (CS) relié au 3,3 V ; module alimenté en 3V3.
-- Choix du S3 : sur le T8 S2, les écritures SD en SPI s'arrêtent avant la fin dès que le Wi-Fi est connecté (9 fichiers sur 20, tests du 2026-11-27), et la mémoire interne est trop juste pour la connexion chiffrée.
+- Choix du S3 : sur le T8 S2, la SD en SPI n'est pas viable avec le Wi-Fi connecté, même sans aucun trafic : écritures arrêtées avant la fin (9 fichiers sur 20 ; 0 sur 20 sans Wi-Fi ; données écrites justes), tests du 2026-11-27 avec `testsd/` (`./run.sh <étape> <nom>`). À refaire sur la XIAO. Mémoire interne du S2 trop juste aussi pour la connexion chiffrée.
 - À venir : LilyGO T-Dongle-S3-Plus (format clé, écran).
 
 ## Matériel : LilyGO T8 ESP32-S2 (V1.1, écran ST7789 1.14"), environnements `t8s2`, `ota`
@@ -55,6 +55,9 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
 - USB Full Speed : ~1 Mo/s max.
 - Pilote SPI de la SD (cœur Arduino, T8) : il range les données par mots de 4 octets ; une lecture en milieu de fichier vers une adresse non multiple de 4 fait planter la puce (LoadStoreAlignment, constaté le 2026-11-26). Lectures à position quelconque : depuis un début de secteur, par secteurs de 512 o, via un tampon aligné.
 - Le basculement Sync → USB ne doit pas intervenir pendant une lecture de la brodeuse.
+
+## Acquis (ne pas régresser)
+- Journal de debug du cœur : `-DCORE_DEBUG_LEVEL=2` ne suffit pas, la plateforme ajoute `-DCORE_DEBUG_LEVEL=0` après nos options → `build_unflags = -DCORE_DEBUG_LEVEL=0`.
 
 ## Points ouverts
 - Authentification Google Drive : reportée ; d'abord une simulation du Drive.
