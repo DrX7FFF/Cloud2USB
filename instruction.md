@@ -64,6 +64,9 @@ Son contenu est le reflet d'un dossier Google Drive : on dépose les fichiers de
 - Bouton de synchro : sur la page web pour le proto (toutes les commandes sont sur la page web).
 - Page emblibrary, à adapter plus tard : après « Valider » le code, la page s'affiche avant que l'ESP ait pris le code et reste sur la saisie (pas de rafraîchissement dans cet état) ; il faut recharger à la main.
 
+## À faire
+- Page web : afficher l'état de la carte SD au démarrage (présente / absente), jusqu'ici seulement envoyé au port série (retiré).
+
 ## Étapes
 1. Wi-Fi + page web de réglages.
 2. Carte SD + modes USB / Réseau (commutateur) + FTP.
