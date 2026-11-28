@@ -12,7 +12,8 @@ void setup() {
   heap_caps_malloc_extmem_enable(256);  // réservations dès 256 o en PSRAM : mémoire interne gardée pour la connexion chiffrée (TLS)
 #endif
   startStorage();
-  startNetwork(loadSettings());
+  Settings s = loadSettings();
+  startNetwork(s);
   startWeb();
   startOta();
 }

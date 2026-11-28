@@ -28,7 +28,7 @@ static void pageHome() {
   bool idle = embState() == EmbState::Idle, usb = mode() == Mode::USB;
   String h = "<p>" + String(usb ? "Mode USB (Téléchargement et FTP inactif)" : "Mode WIFI (USB inactif / Téléchargement et FTP actif)") + "</p>";
   if (idle) h += "<form method=post action=/mode><p><button>Passer en mode " + String(usb ? "WiFi" : "USB") + "</button></p></form>";
-  h += "<p>FTP (mode WiFi) : ftp://cloud2usb.local, anonyme</p>";
+  h += "<p>FTP (mode WiFi) : ftp://" + String(WiFi.getHostname()) + ".local, anonyme</p>";
   if (idle) h += "<form method=post action=/emb/start><p><button" + String(usb ? " disabled" : "") + ">Télécharger les nouveaux achats</button></p></form>";
   if (embState() == EmbState::WaitCode)
     h += "<form method=post action=/emb/code><p>Code reçu<br><input name=code inputmode=numeric autocomplete=one-time-code></p>"
@@ -56,6 +56,8 @@ static void pageWifi() {
   Settings s = loadSettings();
   server.send(200, "text/html; charset=utf-8", page("/wifi",
     "<form method=post action=/save>"
+    "<p>Adresse MAC : " + WiFi.macAddress() + "</p>"
+    "<p>Nom de l'appareil (vide = Cloud2USB-XXXXXX)<br><input name=name value=\"" + esc(s.name) + "\"></p>"
     "<p>Nom du réseau<br><input name=ssid value=\"" + esc(s.ssid) + "\"></p>"
     "<p>Mot de passe (vide = inchangé)<br><input name=pass type=password></p>"
     "<p><label><input type=radio name=ipmode value=dhcp onchange=f()" + (s.fixedIp ? "" : " checked") + "> DHCP (IP automatique)</label><br>"
@@ -100,6 +102,7 @@ static void embCodePage() {
 
 static void saveAndRestart() {
   Settings s = loadSettings();
+  s.name = server.arg("name");
   s.ssid = server.arg("ssid");
   if (server.arg("pass").length()) s.pass = server.arg("pass");
   s.fixedIp = server.arg("ipmode") == "static";

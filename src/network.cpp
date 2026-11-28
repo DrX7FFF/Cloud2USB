@@ -4,6 +4,7 @@
 
 IPAddress startNetwork(const Settings &s) {
   IPAddress ip;
+  WiFi.setHostname(deviceName(s).c_str());
   if (s.ssid.length()) {
     WiFi.mode(WIFI_STA);
     IPAddress a, m, g;
@@ -16,6 +17,6 @@ IPAddress startNetwork(const Settings &s) {
     WiFi.softAP("Cloud2USB");
     ip = WiFi.softAPIP();
   }
-  MDNS.begin("cloud2usb");
+  MDNS.begin(deviceName(s).c_str());
   return ip;
 }
