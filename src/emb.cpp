@@ -451,16 +451,15 @@ struct Item { String name, sku, variant, image; int qty; };
 struct Order { String id, at; std::vector<Item> items; };
 
 static String syncOrders() {
-  Settings s = loadSettings();
-  if (s.email.isEmpty() || s.since.isEmpty()) return "e-mail et date de début à renseigner";
-  String since = s.since.length() == 10 ? s.since + "T00:00:00Z" : s.since;
+  if (settings.email.isEmpty() || settings.since.isEmpty()) return "e-mail et date de début à renseigner";
+  String since = settings.since.length() == 10 ? settings.since + "T00:00:00Z" : settings.since;
 
-  ACC = s.site.length() ? s.site : EMB_SITE;
+  ACC = settings.site.length() ? settings.site : EMB_SITE;
   setStatus("Connexion…");
   loadJar();
   token = accessToken();
   if (token.isEmpty()) {
-    String e = login(s.email);
+    String e = login(settings.email);
     if (e.length()) return e;
     token = accessToken();
     if (token.isEmpty()) return "connexion refusée";
@@ -531,9 +530,8 @@ static String syncOrders() {
     }
     addReport(String(name) + " : " + jefs + " .jef, " + imgs + " images\n" + manual);
     since = o.at;
-    Settings cur = loadSettings();
-    cur.since = since;
-    saveSettings(cur);
+    settings.since = since;
+    saveSettings();
     newOrders++;
   }
   if (!newOrders) addReport("Aucune nouvelle commande.");

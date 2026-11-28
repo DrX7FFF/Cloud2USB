@@ -6,3 +6,6 @@ enum class Mode { USB, Network };
 bool startStorage();
 void setMode(Mode m);
 Mode mode();
+
+// Serveur FTP (anonyme) sur la SD, actif uniquement en mode WiFi.
+void handleFtp();

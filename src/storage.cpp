@@ -4,9 +4,11 @@
 #include <USB.h>
 #include <USBMSC.h>
 #include "tusb.h"
+#include <SimpleFTPServer.h>
 
 static USBMSC msc;
 static Mode current = Mode::USB;
+static FtpServer ftp;
 
 static bool mountCard() {
 #ifdef SD_NATIVE
@@ -54,7 +56,13 @@ void setMode(Mode m) {
     tud_disconnect();
     CARD.end();  // relit la carte modifiée par l'appareil USB
     mountCard();
-  } else tud_connect();
+    ftp.begin();
+  } else {
+    ftp.end();
+    tud_connect();
+  }
 }
 
 Mode mode() { return current; }
+
+void handleFtp() { if (current == Mode::Network) ftp.handleFTP(); }

@@ -2,35 +2,34 @@
 #include <Preferences.h>
 #include <esp_mac.h>
 
-Settings loadSettings() {
-  Preferences prefs;  // locale : appelée depuis plusieurs tâches
+Settings settings;
+
+void loadSettings() {
+  Preferences prefs;
   prefs.begin("cloud2usb", true);
-  Settings s{prefs.getBool("fixedip"), prefs.getString("ssid"), prefs.getString("pass"), prefs.getString("email"), prefs.getString("since"), prefs.getString("site"),
-             prefs.getString("ip"), prefs.getString("mask"), prefs.getString("gw"), prefs.getString("name")};
+  settings = {prefs.getBool("fixedip"), prefs.getUInt("ip"), prefs.getUInt("mask"), prefs.getUInt("gw"),
+             prefs.getString("email"), prefs.getString("since"), prefs.getString("site"), prefs.getString("name")};
   prefs.end();
-  return s;
 }
 
-void saveSettings(const Settings &s) {
+void saveSettings() {
   Preferences prefs;
   prefs.begin("cloud2usb", false);
-  prefs.putString("ssid", s.ssid);
-  prefs.putString("pass", s.pass);
-  prefs.putString("email", s.email);
-  prefs.putString("since", s.since);
-  prefs.putString("site", s.site);
-  prefs.putBool("fixedip", s.fixedIp);
-  prefs.putString("ip", s.ip);
-  prefs.putString("mask", s.mask);
-  prefs.putString("gw", s.gw);
-  prefs.putString("name", s.name);
+  prefs.putString("email", settings.email);
+  prefs.putString("since", settings.since);
+  prefs.putString("site", settings.site);
+  prefs.putBool("fixedip", settings.fixedIp);
+  prefs.putUInt("ip", settings.ip);
+  prefs.putUInt("mask", settings.mask);
+  prefs.putUInt("gw", settings.gw);
+  prefs.putString("name", settings.name);
   prefs.end();
 }
 
-String deviceName(const Settings &s) {
-  bool ok = s.name.length() && s.name.length() <= 31;
-  for (char c : s.name) ok &= isalnum(c) || c == '-';
-  if (ok) return s.name;
+String deviceName() {
+  bool ok = settings.name.length() && settings.name.length() <= 31;
+  for (char c : settings.name) ok &= isalnum(c) || c == '-';
+  if (ok) return settings.name;
   uint8_t m[6];
   esp_base_mac_addr_get(m);
   char n[17];

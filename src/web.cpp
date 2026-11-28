@@ -4,6 +4,7 @@
 #include "emb.h"
 #include <WebServer.h>
 #include <WiFi.h>
+#include <esp_wifi.h>
 
 static WebServer server(80);
 
@@ -40,12 +41,11 @@ static void pageHome() {
 }
 
 static void pageSettings() {
-  Settings s = loadSettings();
   String h = embState() != EmbState::Idle ? String("<p>Téléchargement en cours.</p>") :
     "<h2>EmbLibrary</h2><form method=post action=/emb/save>"
-    "<p>E-mail<br><input name=email type=email value=\"" + esc(s.email) + "\"></p>"
-    "<p>Adresse du site (vide = " + String(EMB_SITE) + ")<br><input name=site placeholder=\"" + EMB_SITE + "\" value=\"" + esc(s.site) + "\"></p>"
-    "<p>Depuis (AAAA-MM-JJ, avancé à chaque téléchargement)<br><input name=since value=\"" + esc(s.since) + "\"></p>"
+    "<p>E-mail<br><input name=email type=email value=\"" + esc(settings.email) + "\"></p>"
+    "<p>Adresse du site (vide = " + String(EMB_SITE) + ")<br><input name=site placeholder=\"" + EMB_SITE + "\" value=\"" + esc(settings.site) + "\"></p>"
+    "<p>Depuis (AAAA-MM-JJ, avancé à chaque téléchargement)<br><input name=since value=\"" + esc(settings.since) + "\"></p>"
     "<p><button>Enregistrer</button></p></form>"
     "<h2>Expert</h2><form method=post action=/emb/journal><p>Journal détaillé (Cloud2USB/journal.txt) : " + String(embJournal() ? "activé" : "désactivé") +
     " <button>" + (embJournal() ? "Désactiver" : "Activer") + "</button></p></form>";
@@ -53,15 +53,16 @@ static void pageSettings() {
 }
 
 static void pageWifi() {
-  Settings s = loadSettings();
+  wifi_config_t c{};
+  esp_wifi_get_config(WIFI_IF_STA, &c);  // réseau mémorisé par le pilote Wi-Fi
   server.send(200, "text/html; charset=utf-8", page("/wifi",
     "<form method=post action=/save>"
     "<p>Adresse MAC : " + WiFi.macAddress() + "</p>"
-    "<p>Nom de l'appareil (vide = Cloud2USB-XXXXXX)<br><input name=name value=\"" + esc(s.name) + "\"></p>"
-    "<p>Nom du réseau<br><input name=ssid value=\"" + esc(s.ssid) + "\"></p>"
+    "<p>Nom de l'appareil (vide = Cloud2USB-XXXXXX)<br><input name=name value=\"" + esc(settings.name) + "\"></p>"
+    "<p>Nom du réseau<br><input name=ssid value=\"" + esc(String(c.sta.ssid, strnlen((char *)c.sta.ssid, sizeof c.sta.ssid))) + "\"></p>"
     "<p>Mot de passe (vide = inchangé)<br><input name=pass type=password></p>"
-    "<p><label><input type=radio name=ipmode value=dhcp onchange=f()" + (s.fixedIp ? "" : " checked") + "> DHCP (IP automatique)</label><br>"
-    "<label><input type=radio name=ipmode value=static id=st onchange=f()" + (s.fixedIp ? " checked" : "") + "> IP statique</label></p>"
+    "<p><label><input type=radio name=ipmode value=dhcp onchange=f()" + (settings.fixedIp ? "" : " checked") + "> DHCP (IP automatique)</label><br>"
+    "<label><input type=radio name=ipmode value=static id=st onchange=f()" + (settings.fixedIp ? " checked" : "") + "> IP statique</label></p>"
     "<p>IP<br><input class=ip name=ip value=" + WiFi.localIP().toString() + "></p>"
     "<p>Masque<br><input class=ip name=mask value=" + WiFi.subnetMask().toString() + "></p>"
     "<p>Passerelle (et DNS)<br><input class=ip name=gw value=" + WiFi.gatewayIP().toString() + "></p>"
@@ -77,11 +78,12 @@ static void back(const char *tab) {
 static void home() { back("/"); }
 
 static void embSave() {
-  Settings s = loadSettings();
-  s.email = server.arg("email");
-  s.site = server.arg("site");
-  s.since = server.arg("since");
-  saveSettings(s);
+  if (embState() == EmbState::Idle) {  // sinon « Depuis » avancé par le téléchargement en cours
+    settings.email = server.arg("email");
+    settings.site = server.arg("site");
+    settings.since = server.arg("since");
+    saveSettings();
+  }
   back("/reglage");
 }
 
@@ -101,13 +103,15 @@ static void embCodePage() {
 }
 
 static void saveAndRestart() {
-  Settings s = loadSettings();
-  s.name = server.arg("name");
-  s.ssid = server.arg("ssid");
-  if (server.arg("pass").length()) s.pass = server.arg("pass");
-  s.fixedIp = server.arg("ipmode") == "static";
-  if (s.fixedIp) s.ip = server.arg("ip"), s.mask = server.arg("mask"), s.gw = server.arg("gw");
-  saveSettings(s);
+  settings.name = server.arg("name");
+  settings.fixedIp = server.arg("ipmode") == "static" && settings.ip.fromString(server.arg("ip")) && settings.mask.fromString(server.arg("mask")) && settings.gw.fromString(server.arg("gw"));
+  saveSettings();
+  wifi_config_t c{};
+  esp_wifi_get_config(WIFI_IF_STA, &c);
+  strncpy((char *)c.sta.ssid, server.arg("ssid").c_str(), sizeof c.sta.ssid);
+  if (server.arg("pass").length()) strncpy((char *)c.sta.password, server.arg("pass").c_str(), sizeof c.sta.password);
+  WiFi.enableSTA(true);  // le pilote n'accepte le réseau que si la connexion à une box est active (pas en point d'accès seul)
+  esp_wifi_set_config(WIFI_IF_STA, &c);  // mémorisé par le pilote Wi-Fi
   server.send(200, "text/html; charset=utf-8", "Enregistré, redémarrage…");
   delay(500);
   ESP.restart();
